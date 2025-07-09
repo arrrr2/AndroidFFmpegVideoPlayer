@@ -231,6 +231,9 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
                 isSrEnabled = isChecked;
+                if (openGLImageProcessor != null) {
+                    openGLImageProcessor.setSrEnabled(isChecked);
+                }
                 Log.i(TAG_MAIN, "SR display is now " + (isSrEnabled ? "enabled" : "disabled"));
             }
         });
@@ -440,20 +443,18 @@ public class MainActivity extends AppCompatActivity {
                     recentUpsamplePassTimes.add(pass1End - pass1Start);
 
                     // 3. Perform Pass 2: Composite or Display
-                    if (isSrEnabled) {
-                        long pass2Start = System.nanoTime();
-                        openGLImageProcessor.performCompositePass(
-                                inferenceResult.patchBuffer,
-                                inferenceResult.patchWidth,
-                                inferenceResult.patchHeight,
-                                inferenceResult.patchRect);
-                        long pass2End = System.nanoTime();
-                        recentCompositePassTimes.add(pass2End - pass2Start);
-                    } else {
-                        // If SR is disabled, just display the upscaled background.
-                        openGLImageProcessor.performDisplayPass();
-                        recentCompositePassTimes.add(0L); // No composition time.
-                    }
+                    // The logic to not display the patch is now inside performCompositePass.
+                    // We always call it, but it will only composite if a patch is provided and enabled internally.
+                    // As per the new requirement, we just call composite pass and let it handle everything.
+                    // The isSrEnabled flag is now passed to the processor to select the upsampling method.
+                    long pass2Start = System.nanoTime();
+                    openGLImageProcessor.performCompositePass(
+                            inferenceResult.patchBuffer,
+                            inferenceResult.patchWidth,
+                            inferenceResult.patchHeight,
+                            inferenceResult.patchRect);
+                    long pass2End = System.nanoTime();
+                    recentCompositePassTimes.add(pass2End - pass2Start);
 
                     // CRITICAL: Return the result container and its buffer to their respective pools.
                     rgbaPatchBufferPool.offer(inferenceResult.patchBuffer);
@@ -503,7 +504,12 @@ public class MainActivity extends AppCompatActivity {
                 long inferenceStart = System.nanoTime();
                 TensorBuffer modelOutput = srTFLite.superResolution(modelInput);
                 long inferenceEnd = System.nanoTime();
-                recentInferenceTimes.add(inferenceEnd - inferenceStart);
+                if (isSrEnabled){
+                    recentInferenceTimes.add(inferenceEnd - inferenceStart);
+                }
+                else{
+                    recentInferenceTimes.add(0L);
+                }
 
                 if (modelOutput != null) {
                     modelOutputQueue.put(modelOutput);
@@ -610,8 +616,8 @@ public class MainActivity extends AppCompatActivity {
                 double avgPatchProcMs = avgPatchDataProcessingTimeUs.get() / 1000.0; // Changed to ProcessingTime
 
                 String displayText = String.format(Locale.US,
-                        "YUV: %.2f | TFIn: %.2f | SR: %.2f | BI: %.2f | Patch: %.2f | Comp: %.2f", // Reordered
-                        avgYuvMs, avgTfInProcMs, avgSrMs, avgBiMs, avgPatchProcMs, avgCompMs // Reordered
+                        "YUV: %.2f | TFIn: %.2f | SR: %.2f | BI: %.2f | Comp: %.2f", // Reordered
+                        avgYuvMs, avgTfInProcMs, avgSrMs, avgBiMs, avgCompMs // Reordered
                 );
                 fpsTextView.setText(displayText);
             }
@@ -649,27 +655,27 @@ public class MainActivity extends AppCompatActivity {
 
         String logMsg = String.format(Locale.US,
                 """
-                        TICK --- Loops(ms): [Dec: %.2f, TFIn: %.2f, Infer: %d, Patch: %.2f, GL: %d] ---\s
-                        Takes(ms): [Read: %.2f, TFIn: %d, Infer: %d, Patch: %d, GL: %d] ---\s
-                        Process(ms): [YUV: %.2f, TFIn: %d, SR: %.2f, Patch: %d, BI: %.2f, Comp: %.2f] ---\s
+                        TICK --- Loops(ms): [Dec: %.2f, TFIn: %.2f, Infer: %d,  GL: %d] ---\s
+                        Takes(ms): [Read: %.2f, TFIn: %d, Infer: %d,  GL: %d] ---\s
+                        Process(ms): [YUV: %.2f, TFIn: %d, SR: %.2f, BI: %.2f, Comp: %.2f] ---\s
                         Queues: [tfIn: %d, upsample: %d, modelIn: %d, modelOut: %d, result: %d]""",
                 // Loop Times
                 decoderLoopTimeUs.get() / 1000.0,
                 avgPrepareTfInputProcessingTimeUs.get() / 1000.0, // Changed to avg
                 inferenceLoopTimeMs.get(),
-                avgPatchDataProcessingTimeUs.get() / 1000.0, // Changed to avg
+//                avgPatchDataProcessingTimeUs.get() / 1000.0, // Changed to avg
                 upsampleLoopTimeMs.get(),
                 // Take Times
                 decoderReadTimeUs.get() / 1000.0,
                 prepareTfInputTakeTimeMs.get(),
                 inferenceTakeTimeMs.get(),
-                patchDataTakeTimeMs.get(),
+//                patchDataTakeTimeMs.get(),
                 upsampleTakeTimeMs.get(),
                 // Processing Times
                 avgYuvToRgbTimeUs.get() / 1000.0, // Changed to avg
                 prepareTfInputProcessingTimeMs.get(),
                 avgInferenceTimeUs.get() / 1000.0,
-                patchDataProcessTimeMs.get(),
+//                patchDataProcessTimeMs.get(),
                 avgUpsamplePassTimeUs.get() / 1000.0,
                 avgCompositePassTimeUs.get() / 1000.0,
                 // Queue Sizes

@@ -2,7 +2,6 @@ package com.example.ffmpegvideoplayer.analysis;
 
 import android.app.Activity;
 import android.content.Context;
-import android.graphics.Bitmap;
 import android.os.Build;
 import android.util.Log;
 import android.util.Size;
@@ -26,7 +25,6 @@ import org.tensorflow.lite.support.image.ops.ResizeOp;
 import org.tensorflow.lite.support.metadata.MetadataExtractor;
 import org.tensorflow.lite.support.tensorbuffer.TensorBuffer;
 
-import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -35,7 +33,7 @@ import java.util.concurrent.BlockingQueue;
 public class InferenceTFLite {
 
     private static final String TAG = "[Inference TFLite]";
-    private final String MODEL_FILE = "fin_bicubic_plus_plus_270x480_float32.tflite";
+    private final String MODEL_FILE = "fin_quick_sr.tflite";
     private final Size INPNUT_SIZE = new Size(480, 270); // Width, Height
     private final int[] OUTPUT_SIZE = new int[]{1, 540, 960, 1}; // N, H, W, C
     private final Boolean IS_INT8 = true; // 用于量化路径的用户定义标志

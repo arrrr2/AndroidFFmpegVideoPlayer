@@ -28,9 +28,9 @@
             android:id="@+id/inference"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="5dp"
-            android:layout_marginBottom="20dp"
-            android:text="FPS: "
+            android:layout_marginLeft="16dp"
+            android:layout_marginBottom="16dp"
+            android:text="Actual Time:"
             android:textColor="#FFFFFF"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintLeft_toLeftOf="parent" />
@@ -39,31 +39,20 @@
             android:id="@+id/inference_time"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginEnd="5dp"
-            android:layout_marginBottom="20dp"
+            android:layout_marginRight="16dp"
+            android:layout_marginBottom="16dp"
             android:text="xx ms"
             android:textColor="#FFFFFF"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintRight_toRightOf="parent" />
 
         <TextView
-            android:id="@+id/frame"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="5dp"
-            android:layout_marginBottom="5dp"
-            android:text="Frame size: "
-            android:textColor="#FFFFFF"
-            app:layout_constraintBottom_toTopOf="@id/inference"
-            app:layout_constraintLeft_toLeftOf="parent" />
-
-        <TextView
             android:id="@+id/frame_size"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginEnd="5dp"
-            android:layout_marginBottom="5dp"
-            android:text="heigth x width"
+            android:layout_marginRight="12dp"
+            android:layout_marginBottom="4dp"
+            android:text="FPS: 30"
             android:textColor="#FFFFFF"
             app:layout_constraintBottom_toTopOf="@id/inference_time"
             app:layout_constraintRight_toRightOf="parent" />

@@ -45,6 +45,7 @@ public class OpenGLImageProcessor {
     private int uPatchRectHandle;
     private int uDrawPatchHandle;
     private int uRenderModeHandle;
+    private int uUpsampleMethodHandle;
 
     // FBO for the first pass (upscaling)
     private int[] upscaleFbo = new int[1];
@@ -66,6 +67,7 @@ public class OpenGLImageProcessor {
     private int surfaceHeight;
 
     private Context context;
+    private boolean isSrEnabled = true; // Default to true
 
     private static final float[] VERTICES = {-1.0f, -1.0f, 1.0f, -1.0f, -1.0f, 1.0f, 1.0f, 1.0f};
     private static final float[] TEX_COORDS = {0.0f, 1.0f, 1.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f}; // Flipped Y-axis
@@ -101,6 +103,7 @@ public class OpenGLImageProcessor {
         uPatchRectHandle = GLES20.glGetUniformLocation(programHandle, "u_PatchRect");
         uDrawPatchHandle = GLES20.glGetUniformLocation(programHandle, "u_DrawPatch");
         texelSizeHandle = GLES20.glGetUniformLocation(programHandle, "u_TexelSize"); // Re-confirming handle, though name is same
+        uUpsampleMethodHandle = GLES20.glGetUniformLocation(programHandle, "u_UpsampleMethod");
 
         // Set texture unit uniforms once, since they don't change.
         GLES20.glUniform1i(uBaseTextureHandle, 0); // Corresponds to GL_TEXTURE0
@@ -144,6 +147,7 @@ public class OpenGLImageProcessor {
 
         // Set uniforms for the upscale shader
         GLES20.glUniform1i(uRenderModeHandle, 0); // Mode 0: Upscale
+        GLES20.glUniform1i(uUpsampleMethodHandle, isSrEnabled ? 1 : 0); // 1 for optimal, 0 for standard
         GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
         GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, inputVideoTextureId);
         GLES20.glUniform1i(uBaseTextureHandle, 0);
@@ -201,10 +205,14 @@ public class OpenGLImageProcessor {
 
         // --- FINAL FIX ---
         // Restore the original logic completely.
-        GLES20.glUniform1i(uDrawPatchHandle, srPatchBuffer != null ? 1 : 0);
+        // Temporarily disable drawing the patch as per requirements.
+        // The original logic is kept here for future reference.
+        GLES20.glUniform1i(uDrawPatchHandle, 0 /* srPatchBuffer != null ? 1 : 0 */);
+        /*
         if (srPatchBuffer != null) {
             GLES20.glUniform4f(uPatchRectHandle, patchRect[0], patchRect[1], patchRect[2], patchRect[3]);
         }
+        */
 
         // Bind textures
         GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
@@ -290,6 +298,10 @@ public class OpenGLImageProcessor {
             surface.release();
             surface = null;
         }
+    }
+
+    public void setSrEnabled(boolean isEnabled) {
+        this.isSrEnabled = isEnabled;
     }
 
     // --- Utility Methods ---

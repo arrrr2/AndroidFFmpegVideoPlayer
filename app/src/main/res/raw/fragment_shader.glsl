@@ -14,6 +14,7 @@ uniform bool      u_DrawPatch;        // Pass 2: Flag to control if the patch is
 
 // Mode Control
 uniform int       u_RenderMode;       // 0 for Upscale Pass, 1 for Composite Pass.
+uniform int       u_UpsampleMethod;   // 0 for Mitchell, 1 for Optimal Mitchell.
 
 // --- BILINEAR UPSCALE FUNCTION (for Pass 1) ---
 vec4 textureBilinear(sampler2D tex, vec2 texCoords, vec2 texelSize) {
@@ -36,14 +37,11 @@ vec4 textureBilinear(sampler2D tex, vec2 texCoords, vec2 texelSize) {
     return mix(tx0, tx1, fraction.y);
 }
 // --- CUBIC INTERPOLATION HELPER FUNCTION ---
-// Implements the Catmull-Rom cubic spline interpolation for a single dimension.
 // It calculates an interpolated value between p1 and p2, using p0 and p3 as control points
 // to define the gradient at the boundaries.
 // @param p0, p1, p2, p3: The four consecutive sample points (e.g., colors).
 // @param t: The fractional distance between p1 and p2 (from 0.0 to 1.0).
 vec4 cubic(vec4 p0, vec4 p1, vec4 p2, vec4 p3, float t) {
-    // The polynomial is of the form: a*t^3 + b*t^2 + c*t + d
-    // The coefficients are derived from the Catmull-Rom spline constraints.
     vec4 a = (3.0 * p1 - 3.0 * p2 + p3 - p0) * 0.5;
     vec4 b = (2.0 * p0 - 5.0 * p1 + 4.0 * p2 - p3) * 0.5;
     vec4 c = (p2 - p0) * 0.5;
@@ -63,6 +61,40 @@ vec4 cubic2(vec4 p0, vec4 p1, vec4 p2, vec4 p3, float t) {
 
     return t * t * t * a + t * t * b + t * c + d;
 }
+
+
+vec4 cubic_mitchell(vec4 p0, vec4 p1, vec4 p2, vec4 p3, float t) {
+    const float B = 12.0 / 3.0;
+    const float C = -12.0 / 3.0;
+
+    float t2 = t * t;
+    float t3 = t2 * t;
+
+    // Correct polynomial coefficients derived from the basis matrix
+    vec4 a = ((-1.0*B - 6.0*C) * p0 + (12.0 - 9.0*B - 6.0*C) * p1 + (-12.0 + 9.0*B + 6.0*C) * p2 + (B + 6.0*C) * p3) / 6.0;
+    vec4 b = ((3.0*B + 12.0*C) * p0 + (-18.0 + 12.0*B + 6.0*C) * p1 + (18.0 - 15.0*B - 12.0*C) * p2 + (-6.0*C) * p3) / 6.0;
+    vec4 c = ((-3.0*B - 6.0*C) * p0 + (3.0*B + 6.0*C) * p2) / 6.0;
+    vec4 d = (B * p0 + (6.0 - 2.0*B) * p1 + B * p2) / 6.0;
+
+    return a * t3 + b * t2 + c * t + d;
+}
+
+vec4 cubic_mitchell_optimal(vec4 p0, vec4 p1, vec4 p2, vec4 p3, float t) {
+    const float B = 1.0 / 3.0;
+    const float C = 1.0 / 3.0;
+
+    float t2 = t * t;
+    float t3 = t2 * t;
+
+    // Correct polynomial coefficients derived from the basis matrix
+    vec4 a = ((-1.0*B - 6.0*C) * p0 + (12.0 - 9.0*B - 6.0*C) * p1 + (-12.0 + 9.0*B + 6.0*C) * p2 + (B + 6.0*C) * p3) / 6.0;
+    vec4 b = ((3.0*B + 12.0*C) * p0 + (-18.0 + 12.0*B + 6.0*C) * p1 + (18.0 - 15.0*B - 12.0*C) * p2 + (-6.0*C) * p3) / 6.0;
+    vec4 c = ((-3.0*B - 6.0*C) * p0 + (3.0*B + 6.0*C) * p2) / 6.0;
+    vec4 d = (B * p0 + (6.0 - 2.0*B) * p1 + B * p2) / 6.0;
+
+    return a * t3 + b * t2 + c * t + d;
+}
+
 
 // --- BICUBIC UPSCALE FUNCTION ---
 // Performs bicubic interpolation on a texture.
@@ -89,12 +121,21 @@ vec4 textureBicubic(sampler2D tex, vec2 texCoords, vec2 texelSize) {
         vec4 p3 = texture2D(tex, (int_coord + vec2(3.0, j)) * texelSize);
 
         // Interpolate horizontally using the x-fraction
-        H[j] = cubic(p0, p1, p2, p3, f.x);
+        // Interpolate horizontally using the x-fraction
+        if (u_UpsampleMethod == 1) {
+            H[j] = cubic_mitchell_optimal(p0, p1, p2, p3, f.x);
+        } else {
+            H[j] = cubic_mitchell(p0, p1, p2, p3, f.x);
+        }
     }
 
     // Perform 1 final vertical cubic interpolation on the results of the horizontal ones
     // using the y-fraction to get the final color.
-    return cubic(H[0], H[1], H[2], H[3], f.y);
+    if (u_UpsampleMethod == 1) {
+        return cubic_mitchell_optimal(H[0], H[1], H[2], H[3], f.y);
+    } else {
+        return cubic_mitchell(H[0], H[1], H[2], H[3], f.y);
+    }
 }
 
 // --- MAIN LOGIC ---
