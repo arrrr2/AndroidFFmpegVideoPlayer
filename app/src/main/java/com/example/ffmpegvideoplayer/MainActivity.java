@@ -23,6 +23,12 @@ import android.util.Log;
 import android.view.TextureView;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.widget.Switch;
+import android.widget.CompoundButton;
+import android.os.Build;
+import android.view.View;
+import android.view.WindowInsets;
+import android.view.WindowInsetsController;
 
 import androidx.appcompat.app.AppCompatActivity;
 import android.view.Choreographer;
@@ -148,6 +154,8 @@ public class MainActivity extends AppCompatActivity {
     private static ByteBuffer videoFrameBuffer;
 
     private TextView fpsTextView;
+    private Switch srSwitch;
+    private volatile boolean isSrEnabled = true;
     private boolean isPICO = true;
 
     private final static String deligater="gpu";
@@ -203,8 +211,10 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
 
         textureView = findViewById(R.id.textureView);
         handler = new Handler(Looper.getMainLooper()); // Main thread handler for UI
@@ -215,6 +225,15 @@ public class MainActivity extends AppCompatActivity {
         logHandler = new Handler(logThread.getLooper()); // logHandler is now on the background thread
 
         fpsTextView = findViewById(R.id.inference_time);
+        srSwitch = findViewById(R.id.sr_switch);
+
+        srSwitch.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
+                isSrEnabled = isChecked;
+                Log.i(TAG_MAIN, "SR display is now " + (isSrEnabled ? "enabled" : "disabled"));
+            }
+        });
 
         textureView.setSurfaceTextureListener(new TextureView.SurfaceTextureListener() {
             @Override
@@ -420,15 +439,21 @@ public class MainActivity extends AppCompatActivity {
                     long pass1End = System.nanoTime();
                     recentUpsamplePassTimes.add(pass1End - pass1Start);
 
-                    // 3. Perform Pass 2: Composite
-                    long pass2Start = System.nanoTime();
-                    openGLImageProcessor.performCompositePass(
-                            inferenceResult.patchBuffer,
-                            inferenceResult.patchWidth,
-                            inferenceResult.patchHeight,
-                            inferenceResult.patchRect);
-                    long pass2End = System.nanoTime();
-                    recentCompositePassTimes.add(pass2End - pass2Start);
+                    // 3. Perform Pass 2: Composite or Display
+                    if (isSrEnabled) {
+                        long pass2Start = System.nanoTime();
+                        openGLImageProcessor.performCompositePass(
+                                inferenceResult.patchBuffer,
+                                inferenceResult.patchWidth,
+                                inferenceResult.patchHeight,
+                                inferenceResult.patchRect);
+                        long pass2End = System.nanoTime();
+                        recentCompositePassTimes.add(pass2End - pass2Start);
+                    } else {
+                        // If SR is disabled, just display the upscaled background.
+                        openGLImageProcessor.performDisplayPass();
+                        recentCompositePassTimes.add(0L); // No composition time.
+                    }
 
                     // CRITICAL: Return the result container and its buffer to their respective pools.
                     rgbaPatchBufferPool.offer(inferenceResult.patchBuffer);

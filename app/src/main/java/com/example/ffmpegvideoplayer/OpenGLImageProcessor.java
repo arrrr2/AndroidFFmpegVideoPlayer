@@ -225,6 +225,47 @@ public class OpenGLImageProcessor {
         }
     }
 
+    /**
+     * Pass 2 (Alternate): Renders just the upscaled background to the screen without any SR patch.
+     */
+    public void performDisplayPass() {
+        if (eglDisplay == EGL14.EGL_NO_DISPLAY) {
+            return; // EGL not initialized
+        }
+
+        handleSurfaceChange();
+
+        if (eglSurface == null || eglSurface == EGL14.EGL_NO_SURFACE) {
+            // This is expected if the TextureView is not available yet.
+            return;
+        }
+
+        // Bind the default framebuffer (the one for the EGL window surface)
+        GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0);
+        GLES20.glViewport(0, 0, surfaceWidth, surfaceHeight);
+
+        // Clear the screen
+        GLES20.glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+        GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT);
+
+        // Set uniforms to draw the upscaled texture but disable the patch
+        GLES20.glUniform1i(uRenderModeHandle, 1); // Use composite mode logic in shader
+        GLES20.glUniform1i(uDrawPatchHandle, 0); // Tell shader NOT to draw the patch
+
+        // Bind the upscaled texture
+        GLES20.glActiveTexture(GLES20.GL_TEXTURE0);
+        GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, upscaledTexture[0]);
+
+        // Draw the quad
+        drawQuad();
+
+        // Swap buffers to display the rendered frame
+        if (!EGL14.eglSwapBuffers(eglDisplay, eglSurface)) {
+            Log.e(TAG, "eglSwapBuffers failed!");
+            checkEglError("eglSwapBuffers");
+        }
+    }
+
     public void release() {
         if (eglDisplay != EGL14.EGL_NO_DISPLAY) {
             EGL14.eglMakeCurrent(eglDisplay, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_CONTEXT);
